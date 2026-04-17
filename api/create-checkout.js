@@ -1,25 +1,52 @@
-export default function handler(req, res) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+import Stripe from "stripe";
 
-  // Trả lời preflight request của trình duyệt
-  if (req.method === 'OPTIONS') {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  if (req.method === 'POST') {
-    const { cart } = req.body || {};
-
-    console.log('Received cart:', cart);
-
-    return res.status(200).json({
-      success: true,
-      message: 'Cart received successfully',
-      cart_item_count: cart?.item_count ?? 0
-    });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const { items } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "Cart is empty or invalid" });
+    }
+
+    const line_items = items.map((item) => ({
+      price_data: {
+        currency: "usd",
+        product_data: {
+          name: item.title || "Product",
+          images: item.image ? [item.image] : [],
+        },
+        unit_amount: Math.round(Number(item.price) * 100),
+      },
+      quantity: item.quantity || 1,
+    }));
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items,
+      success_url: "https://dinhnova.com/pages/success?session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://dinhnova.com/cart",
+    });
+
+    return res.status(200).json({ url: session.url });
+  } catch (error) {
+    console.error("Stripe error:", error);
+    return res.status(500).json({
+      error: error.message || "Internal server error",
+    });
+  }
 }
