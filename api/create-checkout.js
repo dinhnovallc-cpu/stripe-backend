@@ -22,17 +22,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Cart is empty or invalid" });
     }
 
-    const line_items = items.map((item) => ({
-      price_data: {
-        currency: "usd",
-        product_data: {
-          name: item.title || "Product",
-          images: item.image ? [item.image.startsWith('http') ? item.image : 'https:' + item.image] : [],
-        },
-        unit_amount: Math.round(Number(item.price) * 100),
-      },
-      quantity: item.quantity || 1,
-    }));
+  const line_items = items.map((item) => ({
+  price_data: {
+    currency: "usd",
+    product_data: {
+      name: item.title || "Product"
+    },
+    unit_amount: Math.round(Number(item.price) * 100),
+  },
+  quantity: item.quantity || 1,
+}));
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
