@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       payment_method_types: ["card"],
       mode: "payment",
       line_items,
-      success_url: "https://dinhnova.com/pages/success?session_id={CHECKOUT_SESSION_ID}",
+      success_url: 'https://dinhnova.com/?payment=success&session_id={CHECKOUT_SESSION_ID}',
       cancel_url: "https://dinhnova.com/cart",
     });
 
