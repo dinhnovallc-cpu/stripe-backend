@@ -34,12 +34,17 @@ export default async function handler(req, res) {
 }));
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "payment",
-      line_items,
-      success_url: 'https://dinhnova.com/pages/thank-you',
-      cancel_url: "https://dinhnova.com/cart",
-    });
+  payment_method_types: ['card'],
+  mode: 'payment',
+  line_items: lineItems,
+
+  shipping_address_collection: {
+    allowed_countries: ['US'],
+  },
+
+  success_url: 'https://dinhnova.com/pages/thank-you',
+  cancel_url: 'https://dinhnova.com/cart',
+});
 
     return res.status(200).json({ url: session.url });
   } catch (error) {
