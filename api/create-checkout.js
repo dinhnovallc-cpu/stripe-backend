@@ -37,10 +37,12 @@ export default async function handler(req, res) {
   payment_method_types: ['card'],
   mode: 'payment',
   line_items: lineItems,
-
   shipping_address_collection: {
     allowed_countries: ['US'],
   },
+  success_url: 'https://dinhnova.com/pages/thank-you',
+  cancel_url: 'https://dinhnova.com/cart',
+});
 
   success_url: 'https://dinhnova.com/pages/thank-you',
   cancel_url: 'https://dinhnova.com/cart',
