@@ -1,58 +1,97 @@
-import Stripe from "stripe";
+import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', 'https://dinhnova.com');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { items } = req.body;
+    // Body có thể đã là object, hoặc vẫn là string
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "Cart is empty or invalid" });
+    console.log('Received body:', JSON.stringify(body, null, 2));
+
+    if (!body || !body.items || !Array.isArray(body.items) || body.items.length === 0) {
+      return res.status(400).json({ error: 'Cart is empty or invalid' });
     }
 
-  const line_items = items.map((item) => ({
-  price_data: {
-    currency: "usd",
-    product_data: {
-      name: item.title || "Product"
-    },
-    unit_amount: Math.round(Number(item.price) * 100),
-  },
-  quantity: item.quantity || 1,
-}));
+    const line_items = body.items.map((item) => {
+      const unitAmount = Math.round(Number(item.price) * 100);
 
-  const session = await stripe.checkout.sessions.create({
-  payment_method_types: ['card'],
-  mode: 'payment',
-  line_items: lineItems,
-  shipping_address_collection: {
-    allowed_countries: ['US'],
-  },
-  success_url: 'https://dinhnova.com/pages/thank-you',
-  cancel_url: 'https://dinhnova.com/cart',
-});
+      if (!item.title || !unitAmount || !item.quantity) {
+        throw new Error('Invalid cart item data');
+      }
 
-  success_url: 'https://dinhnova.com/pages/thank-you',
-  cancel_url: 'https://dinhnova.com/cart',
-});
+      return {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: item.title,
+            images: item.image ? [item.image] : [],
+          },
+          unit_amount: unitAmount,
+        },
+        quantity: item.quantity,
+      };
+    });
 
-    return res.status(200).json({ url: session.url });
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+
+      line_items,
+
+      // Hiện địa chỉ giao hàng
+      shipping_address_collection: {
+        allowed_countries: ['US'],
+      },
+
+      // Hiện 1 lựa chọn shipping cơ bản
+      shipping_options: [
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: {
+              amount: 0,
+              currency: 'usd',
+            },
+            display_name: 'Standard Shipping',
+            delivery_estimate: {
+              minimum: { unit: 'business_day', value: 5 },
+              maximum: { unit: 'business_day', value: 10 },
+            },
+          },
+        },
+      ],
+
+      phone_number_collection: {
+        enabled: true,
+      },
+
+      success_url: 'https://dinhnova.com/pages/thank-you',
+      cancel_url: 'https://dinhnova.com/cart',
+    });
+
+    console.log('Stripe session created:', session.id);
+
+    return res.status(200).json({
+      url: session.url,
+    });
   } catch (error) {
-    console.error("Stripe error:", error);
+    console.error('Stripe checkout error:', error);
     return res.status(500).json({
-      error: error.message || "Internal server error",
+      error: error.message || 'Failed to create Stripe Checkout session',
     });
   }
 }
