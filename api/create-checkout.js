@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   quantity: item.quantity || 1,
 }));
 
-    const session = await stripe.checkout.sessions.create({
+  const session = await stripe.checkout.sessions.create({
   payment_method_types: ['card'],
   mode: 'payment',
   line_items: lineItems,
