@@ -27,7 +27,7 @@ export default async function handler(req, res) {
         currency: "usd",
         product_data: {
           name: item.title || "Product",
-          images: item.image ? [item.image] : [],
+          images: item.image ? [item.image.startsWith('http') ? item.image : 'https:' + item.image] : [],
         },
         unit_amount: Math.round(Number(item.price) * 100),
       },
