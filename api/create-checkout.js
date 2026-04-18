@@ -142,8 +142,8 @@ const session = await stripe.checkout.sessions.create({
   },
 
   shipping_address_collection: {
-    allowed_countries: ['US']
-  },
+  allowed_countries: ['US', 'SE', 'DE', 'GB', 'FR']
+},
 
   shipping_options: shippingOptions,
 
