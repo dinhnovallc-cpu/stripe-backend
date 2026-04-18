@@ -135,6 +135,8 @@ const session = await stripe.checkout.sessions.create({
   mode: 'payment',
   line_items: lineItems,
 
+  locale: 'en',
+  
   billing_address_collection: 'required',
 
   phone_number_collection: {
