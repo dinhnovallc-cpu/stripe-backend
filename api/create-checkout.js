@@ -51,8 +51,8 @@ export default async function handler(req, res) {
         allowed_countries: ['US'],
       },
 
-      success_url: `${origin}/pages/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/cart`,
+      success_url: `https://dinhnova.com/pages/thank-you?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `https://dinhnova.com/cart`,
     });
 
     return res.status(200).json({ url: session.url });
