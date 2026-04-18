@@ -51,6 +51,49 @@ export default async function handler(req, res) {
         allowed_countries: ['US'],
       },
 
+      shipping_options: [
+  {
+    shipping_rate_data: {
+      type: 'fixed_amount',
+      fixed_amount: {
+        amount: 0,
+        currency: 'usd'
+      },
+      display_name: 'Free Shipping',
+      delivery_estimate: {
+        minimum: {
+          unit: 'business_day',
+          value: 5
+        },
+        maximum: {
+          unit: 'business_day',
+          value: 7
+        }
+      }
+    }
+  },
+  {
+    shipping_rate_data: {
+      type: 'fixed_amount',
+      fixed_amount: {
+        amount: 999,
+        currency: 'usd'
+      },
+      display_name: 'Express Shipping',
+      delivery_estimate: {
+        minimum: {
+          unit: 'business_day',
+          value: 2
+        },
+        maximum: {
+          unit: 'business_day',
+          value: 3
+        }
+      }
+    }
+  }
+],
+
       success_url: `https://dinhnova.com/pages/thank-you?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://dinhnova.com/cart`,
     });
