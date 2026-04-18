@@ -27,76 +27,129 @@ export default async function handler(req, res) {
     }
 
     const lineItems = items.map((item) => ({
-      price_data: {
-        currency: 'usd',
-        product_data: {
-          name: item.title || 'Product',
-        },
-        unit_amount: Math.round(Number(item.price) * 100),
-      },
-      quantity: item.quantity || 1,
-    }));
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: lineItems,
-
-      billing_address_collection: 'required',
-
-      phone_number_collection: {
-        enabled: true,
-      },
-
-      shipping_address_collection: {
-        allowed_countries: ['US'],
-      },
-
-      shipping_options: [
-  {
-    shipping_rate_data: {
-      type: 'fixed_amount',
-      fixed_amount: {
-        amount: 0,
-        currency: 'usd'
-      },
-      display_name: 'Free Shipping',
-      delivery_estimate: {
-        minimum: {
-          unit: 'business_day',
-          value: 5
-        },
-        maximum: {
-          unit: 'business_day',
-          value: 7
-        }
-      }
-    }
+  price_data: {
+    currency: 'usd',
+    product_data: {
+      name: item.title || 'Product'
+    },
+    unit_amount: Math.round(Number(item.price) * 100)
   },
-  {
-    shipping_rate_data: {
-      type: 'fixed_amount',
-      fixed_amount: {
-        amount: 999,
-        currency: 'usd'
-      },
-      display_name: 'Express Shipping',
-      delivery_estimate: {
-        minimum: {
-          unit: 'business_day',
-          value: 2
+  quantity: item.quantity || 1
+}));
+
+const cartTotal = lineItems.reduce((sum, item) => {
+  return sum + (item.price_data.unit_amount * item.quantity);
+}, 0);
+
+let shippingOptions;
+
+if (cartTotal >= 4900) {
+  shippingOptions = [
+    {
+      shipping_rate_data: {
+        type: 'fixed_amount',
+        fixed_amount: {
+          amount: 0,
+          currency: 'usd'
         },
-        maximum: {
-          unit: 'business_day',
-          value: 3
+        display_name: 'Free Shipping',
+        delivery_estimate: {
+          minimum: {
+            unit: 'business_day',
+            value: 5
+          },
+          maximum: {
+            unit: 'business_day',
+            value: 7
+          }
+        }
+      }
+    },
+    {
+      shipping_rate_data: {
+        type: 'fixed_amount',
+        fixed_amount: {
+          amount: 999,
+          currency: 'usd'
+        },
+        display_name: 'Express Shipping',
+        delivery_estimate: {
+          minimum: {
+            unit: 'business_day',
+            value: 2
+          },
+          maximum: {
+            unit: 'business_day',
+            value: 3
+          }
         }
       }
     }
-  }
-],
+  ];
+} else {
+  shippingOptions = [
+    {
+      shipping_rate_data: {
+        type: 'fixed_amount',
+        fixed_amount: {
+          amount: 499,
+          currency: 'usd'
+        },
+        display_name: 'Standard Shipping',
+        delivery_estimate: {
+          minimum: {
+            unit: 'business_day',
+            value: 5
+          },
+          maximum: {
+            unit: 'business_day',
+            value: 7
+          }
+        }
+      }
+    },
+    {
+      shipping_rate_data: {
+        type: 'fixed_amount',
+        fixed_amount: {
+          amount: 999,
+          currency: 'usd'
+        },
+        display_name: 'Express Shipping',
+        delivery_estimate: {
+          minimum: {
+            unit: 'business_day',
+            value: 2
+          },
+          maximum: {
+            unit: 'business_day',
+            value: 3
+          }
+        }
+      }
+    }
+  ];
+}
 
-      success_url: `https://dinhnova.com/pages/thank-you?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `https://dinhnova.com/cart`,
-    });
+const session = await stripe.checkout.sessions.create({
+  mode: 'payment',
+  line_items: lineItems,
+
+  billing_address_collection: 'required',
+
+  phone_number_collection: {
+    enabled: true
+  },
+
+  shipping_address_collection: {
+    allowed_countries: ['US']
+  },
+
+  shipping_options: shippingOptions,
+
+  success_url: `https://dinhnova.com/pages/thank-you?session_id={CHECKOUT_SESSION_ID}`,
+  cancel_url: `https://dinhnova.com/cart`
+});
 
     return res.status(200).json({ url: session.url });
   } catch (error) {
