@@ -30,7 +30,6 @@ module.exports = async function handler(req, res) {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
       console.log("Checkout completed:", session.id);
-
       await createShopifyOrder(session);
     }
 
@@ -76,30 +75,69 @@ async function getStripeLineItems(sessionId) {
 
   return lineItems.data.map((item) => {
     const product = item.price?.product;
-    const currency = item.currency?.toUpperCase() || "USD";
-    const amount = ((item.amount_total || item.amount_subtotal || 0) / 100).toFixed(2);
-    const quantity = item.quantity || 1;
-    const unitPrice = (Number(amount) / quantity).toFixed(2);
+    const metadata = product?.metadata || {};
 
-    return {
-      title:
-        product?.name ||
-        item.description ||
-        "Stripe Checkout Product",
+    const variantId = metadata.shopify_variant_id;
+    const originalPrice = metadata.original_price;
+    const finalPrice = metadata.final_price;
+
+    const quantity = item.quantity || 1;
+    const lineTotal = ((item.amount_total || item.amount_subtotal || 0) / 100).toFixed(2);
+    const unitPrice = (Number(lineTotal) / quantity).toFixed(2);
+
+    const lineItem = {
       quantity,
       price: unitPrice,
       properties: [
-        {
-          name: "Stripe Product ID",
-          value: product?.id || "",
-        },
-        {
-          name: "Stripe Price ID",
-          value: item.price?.id || "",
-        },
+        { name: "Stripe Product ID", value: product?.id || "" },
+        { name: "Stripe Price ID", value: item.price?.id || "" },
       ],
     };
+
+    if (originalPrice) {
+      lineItem.properties.push({
+        name: "Original Price",
+        value: originalPrice,
+      });
+    }
+
+    if (finalPrice) {
+      lineItem.properties.push({
+        name: "Sale Price",
+        value: finalPrice,
+      });
+    }
+
+    if (variantId && !Number.isNaN(Number(variantId))) {
+      lineItem.variant_id = Number(variantId);
+    } else {
+      lineItem.title = product?.name || item.description || "Stripe Checkout Product";
+    }
+
+    return lineItem;
   });
+}
+
+async function getShippingLine(session) {
+  const amountShipping = session.total_details?.amount_shipping || 0;
+
+  let shippingName = "Shipping";
+
+  if (session.shipping_cost?.shipping_rate) {
+    try {
+      const rate = await stripe.shippingRates.retrieve(session.shipping_cost.shipping_rate);
+      shippingName = rate.display_name || shippingName;
+    } catch (err) {
+      console.error("Failed to retrieve Stripe shipping rate:", err.message);
+    }
+  }
+
+  return {
+    title: shippingName,
+    price: (amountShipping / 100).toFixed(2),
+    code: shippingName,
+    source: "Stripe Checkout",
+  };
 }
 
 async function createShopifyOrder(session) {
@@ -107,7 +145,7 @@ async function createShopifyOrder(session) {
   const token = await getShopifyAccessToken();
 
   const currency = (session.currency || "usd").toUpperCase();
-  const amount = ((session.amount_total || 0) / 100).toFixed(2);
+  const orderTotal = ((session.amount_total || 0) / 100).toFixed(2);
 
   const customerEmail =
     session.customer_details?.email ||
@@ -119,6 +157,7 @@ async function createShopifyOrder(session) {
   const lastName = fullName.split(" ").slice(1).join(" ") || "";
 
   const lineItems = await getStripeLineItems(session.id);
+  const shippingLine = await getShippingLine(session);
 
   const orderPayload = {
     order: {
@@ -131,12 +170,13 @@ async function createShopifyOrder(session) {
       send_receipt: true,
 
       line_items: lineItems,
+      shipping_lines: [shippingLine],
 
       transactions: [
         {
           kind: "sale",
           status: "success",
-          amount,
+          amount: orderTotal,
           gateway: "Stripe",
         },
       ],
