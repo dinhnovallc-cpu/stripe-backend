@@ -12,10 +12,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const chunks = [];
-
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
+    for await (const chunk of req) chunks.push(chunk);
 
     const rawBody = Buffer.concat(chunks);
 
@@ -32,7 +29,6 @@ module.exports = async function handler(req, res) {
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
-
       console.log("Checkout completed:", session.id);
 
       await createShopifyOrder(session);
@@ -46,23 +42,15 @@ module.exports = async function handler(req, res) {
 };
 
 async function getShopifyAccessToken() {
-  if (cachedShopifyToken) {
-    return cachedShopifyToken;
-  }
+  if (cachedShopifyToken) return cachedShopifyToken;
 
   const shop = process.env.SHOPIFY_STORE_DOMAIN;
   const clientId = process.env.SHOPIFY_CLIENT_ID;
   const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
 
-  if (!shop || !clientId || !clientSecret) {
-    throw new Error("Missing Shopify environment variables");
-  }
-
   const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       client_id: clientId,
       client_secret: clientSecret,
@@ -72,8 +60,6 @@ async function getShopifyAccessToken() {
 
   const data = await response.json();
 
-  console.log("Shopify token response:", JSON.stringify(data, null, 2));
-
   if (!response.ok || !data.access_token) {
     throw new Error(`Failed to get Shopify access token: ${JSON.stringify(data)}`);
   }
@@ -82,19 +68,57 @@ async function getShopifyAccessToken() {
   return cachedShopifyToken;
 }
 
+async function getStripeLineItems(sessionId) {
+  const lineItems = await stripe.checkout.sessions.listLineItems(sessionId, {
+    limit: 100,
+    expand: ["data.price.product"],
+  });
+
+  return lineItems.data.map((item) => {
+    const product = item.price?.product;
+    const currency = item.currency?.toUpperCase() || "USD";
+    const amount = ((item.amount_total || item.amount_subtotal || 0) / 100).toFixed(2);
+    const quantity = item.quantity || 1;
+    const unitPrice = (Number(amount) / quantity).toFixed(2);
+
+    return {
+      title:
+        product?.name ||
+        item.description ||
+        "Stripe Checkout Product",
+      quantity,
+      price: unitPrice,
+      properties: [
+        {
+          name: "Stripe Product ID",
+          value: product?.id || "",
+        },
+        {
+          name: "Stripe Price ID",
+          value: item.price?.id || "",
+        },
+      ],
+    };
+  });
+}
+
 async function createShopifyOrder(session) {
   const shop = process.env.SHOPIFY_STORE_DOMAIN;
   const token = await getShopifyAccessToken();
 
-  const amount = ((session.amount_total || 0) / 100).toFixed(2);
   const currency = (session.currency || "usd").toUpperCase();
+  const amount = ((session.amount_total || 0) / 100).toFixed(2);
 
   const customerEmail =
     session.customer_details?.email ||
     session.customer_email ||
     "no-email@stripe-checkout.local";
 
-  const name = session.customer_details?.name || "";
+  const fullName = session.customer_details?.name || "";
+  const firstName = fullName.split(" ")[0] || "";
+  const lastName = fullName.split(" ").slice(1).join(" ") || "";
+
+  const lineItems = await getStripeLineItems(session.id);
 
   const orderPayload = {
     order: {
@@ -105,13 +129,9 @@ async function createShopifyOrder(session) {
       tags: "Stripe Checkout, External Payment",
       note: `Stripe Checkout Session: ${session.id}`,
       send_receipt: true,
-      line_items: [
-        {
-          title: "Stripe Checkout Order",
-          quantity: 1,
-          price: amount,
-        },
-      ],
+
+      line_items: lineItems,
+
       transactions: [
         {
           kind: "sale",
@@ -120,15 +140,17 @@ async function createShopifyOrder(session) {
           gateway: "Stripe",
         },
       ],
+
       customer: {
-        first_name: name.split(" ")[0] || "",
-        last_name: name.split(" ").slice(1).join(" ") || "",
+        first_name: firstName,
+        last_name: lastName,
         email: customerEmail,
       },
+
       shipping_address: session.customer_details?.address
         ? {
-            first_name: name.split(" ")[0] || "",
-            last_name: name.split(" ").slice(1).join(" ") || "",
+            first_name: firstName,
+            last_name: lastName,
             address1: session.customer_details.address.line1 || "",
             address2: session.customer_details.address.line2 || "",
             city: session.customer_details.address.city || "",
