@@ -1,5 +1,6 @@
-update
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+let cachedShopifyToken = null;
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -44,83 +45,118 @@ module.exports = async function handler(req, res) {
   }
 };
 
+async function getShopifyAccessToken() {
+  if (cachedShopifyToken) {
+    return cachedShopifyToken;
+  }
+
+  const shop = process.env.SHOPIFY_STORE_DOMAIN;
+  const clientId = process.env.SHOPIFY_CLIENT_ID;
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+
+  if (!shop || !clientId || !clientSecret) {
+    throw new Error("Missing Shopify environment variables");
+  }
+
+  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "client_credentials",
+    }),
+  });
+
+  const data = await response.json();
+
+  console.log("Shopify token response:", JSON.stringify(data, null, 2));
+
+  if (!response.ok || !data.access_token) {
+    throw new Error(`Failed to get Shopify access token: ${JSON.stringify(data)}`);
+  }
+
+  cachedShopifyToken = data.access_token;
+  return cachedShopifyToken;
+}
+
 async function createShopifyOrder(session) {
   const shop = process.env.SHOPIFY_STORE_DOMAIN;
-  const token = process.env.SHOPIFY_ADMIN_API_ACCESS_TOKEN;
+  const token = await getShopifyAccessToken();
 
-  const mutation = `
-    mutation orderCreate($order: OrderCreateOrderInput!) {
-      orderCreate(order: $order) {
-        order {
-          id
-          name
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-  `;
+  const amount = ((session.amount_total || 0) / 100).toFixed(2);
+  const currency = (session.currency || "usd").toUpperCase();
 
-  const variables = {
+  const customerEmail =
+    session.customer_details?.email ||
+    session.customer_email ||
+    "no-email@stripe-checkout.local";
+
+  const name = session.customer_details?.name || "";
+
+  const orderPayload = {
     order: {
-      email: session.customer_details?.email || session.customer_email,
-      currency: session.currency?.toUpperCase() || "USD",
-      financialStatus: "PAID",
-      sourceName: "Stripe Checkout",
-      tags: ["Stripe Checkout", "External Payment"],
+      email: customerEmail,
+      currency,
+      financial_status: "paid",
+      source_name: "Stripe Checkout",
+      tags: "Stripe Checkout, External Payment",
       note: `Stripe Checkout Session: ${session.id}`,
-      lineItems: [
+      send_receipt: true,
+      line_items: [
         {
           title: "Stripe Checkout Order",
           quantity: 1,
-          priceSet: {
-            shopMoney: {
-              amount: (session.amount_total / 100).toFixed(2),
-              currencyCode: session.currency?.toUpperCase() || "USD",
-            },
-          },
+          price: amount,
         },
       ],
       transactions: [
         {
-          kind: "SALE",
-          status: "SUCCESS",
-          amountSet: {
-            shopMoney: {
-              amount: (session.amount_total / 100).toFixed(2),
-              currencyCode: session.currency?.toUpperCase() || "USD",
-            },
-          },
+          kind: "sale",
+          status: "success",
+          amount,
           gateway: "Stripe",
         },
       ],
+      customer: {
+        first_name: name.split(" ")[0] || "",
+        last_name: name.split(" ").slice(1).join(" ") || "",
+        email: customerEmail,
+      },
+      shipping_address: session.customer_details?.address
+        ? {
+            first_name: name.split(" ")[0] || "",
+            last_name: name.split(" ").slice(1).join(" ") || "",
+            address1: session.customer_details.address.line1 || "",
+            address2: session.customer_details.address.line2 || "",
+            city: session.customer_details.address.city || "",
+            province: session.customer_details.address.state || "",
+            country: session.customer_details.address.country || "",
+            zip: session.customer_details.address.postal_code || "",
+            phone: session.customer_details.phone || "",
+          }
+        : undefined,
     },
   };
 
-  const response = await fetch(
-    `https://${shop}/admin/api/2026-01/graphql.json`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": token,
-      },
-      body: JSON.stringify({
-        query: mutation,
-        variables,
-      }),
-    }
-  );
+  const response = await fetch(`https://${shop}/admin/api/2026-01/orders.json`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": token,
+    },
+    body: JSON.stringify(orderPayload),
+  });
 
   const data = await response.json();
 
-  console.log("Shopify response:", JSON.stringify(data, null, 2));
+  console.log("Shopify order response:", JSON.stringify(data, null, 2));
 
-  if (data.errors || data.data?.orderCreate?.userErrors?.length) {
-    throw new Error(JSON.stringify(data));
+  if (!response.ok || !data.order) {
+    throw new Error(`Failed to create Shopify order: ${JSON.stringify(data)}`);
   }
 
-  return data.data.orderCreate.order;
+  return data.order;
 }
