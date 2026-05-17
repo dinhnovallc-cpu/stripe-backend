@@ -145,7 +145,7 @@ async function createShopifyOrder(session) {
   const token = await getShopifyAccessToken();
 
   const currency = (session.currency || "usd").toUpperCase();
-  const orderTotal = ((session.amount_total || 0) / 100).toFixed(2);
+  const orderTotal = ((session.amount_subtotal || 0) / 100).toFixed(2);
 
   const customerEmail =
     session.customer_details?.email ||
