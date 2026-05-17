@@ -177,7 +177,7 @@ async function createShopifyOrder(session) {
           kind: "sale",
           status: "success",
           amount: orderTotal,
-          gateway: "Stripe",
+          gateway: "Stripe Checkout",
         },
       ],
 
