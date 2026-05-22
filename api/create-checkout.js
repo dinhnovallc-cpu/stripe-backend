@@ -53,95 +53,75 @@ export default async function handler(req, res) {
       return sum + item.price_data.unit_amount * item.quantity;
     }, 0);
 
-    let shippingOptions;
+    let shippingOptions = [];
 
-    if (cartTotal >= 4900) {
-      shippingOptions = [
-        {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: {
-              amount: 0,
-              currency: "usd",
-            },
-            display_name: "Free Shipping",
-            delivery_estimate: {
-              minimum: {
-                unit: "business_day",
-                value: 5,
-              },
-              maximum: {
-                unit: "business_day",
-                value: 7,
-              },
-            },
-          },
-        },
-        {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: {
-              amount: 999,
-              currency: "usd",
-            },
-            display_name: "Express Shipping",
-            delivery_estimate: {
-              minimum: {
-                unit: "business_day",
-                value: 2,
-              },
-              maximum: {
-                unit: "business_day",
-                value: 3,
-              },
-            },
-          },
-        },
-      ];
-    } else {
-      shippingOptions = [
-        {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: {
-              amount: 499,
-              currency: "usd",
-            },
-            display_name: "Standard Shipping",
-            delivery_estimate: {
-              minimum: {
-                unit: "business_day",
-                value: 5,
-              },
-              maximum: {
-                unit: "business_day",
-                value: 7,
-              },
-            },
-          },
-        },
-        {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: {
-              amount: 999,
-              currency: "usd",
-            },
-            display_name: "Express Shipping",
-            delivery_estimate: {
-              minimum: {
-                unit: "business_day",
-                value: 2,
-              },
-              maximum: {
-                unit: "business_day",
-                value: 3,
-              },
-            },
-          },
-        },
-      ];
-    }
+if (cartTotal <= 4800) {
+  shippingOptions.push({
+    shipping_rate_data: {
+      type: "fixed_amount",
+      fixed_amount: {
+        amount: 590,
+        currency: "usd",
+      },
+      display_name: "Standard Shipping",
+      delivery_estimate: {
+        minimum: { unit: "business_day", value: 3 },
+        maximum: { unit: "business_day", value: 12 },
+      },
+    },
+  });
+}
+
+if (cartTotal >= 4900 && cartTotal <= 30000) {
+  shippingOptions.push({
+    shipping_rate_data: {
+      type: "fixed_amount",
+      fixed_amount: {
+        amount: 0,
+        currency: "usd",
+      },
+      display_name: "Standard Free Shipping",
+      delivery_estimate: {
+        minimum: { unit: "business_day", value: 3 },
+        maximum: { unit: "business_day", value: 6 },
+      },
+    },
+  });
+}
+
+if (cartTotal >= 0 && cartTotal <= 30000) {
+  shippingOptions.push({
+    shipping_rate_data: {
+      type: "fixed_amount",
+      fixed_amount: {
+        amount: 1990,
+        currency: "usd",
+      },
+      display_name: "Expedited Shipping",
+      delivery_estimate: {
+        minimum: { unit: "business_day", value: 2 },
+        maximum: { unit: "business_day", value: 3 },
+      },
+    },
+  });
+}
+
+if (cartTotal >= 30100) {
+  shippingOptions.push({
+    shipping_rate_data: {
+      type: "fixed_amount",
+      fixed_amount: {
+        amount: 690,
+        currency: "usd",
+      },
+      display_name: "Large Order Shipping",
+      delivery_estimate: {
+        minimum: { unit: "business_day", value: 3 },
+        maximum: { unit: "business_day", value: 7 },
+      },
+    },
+  });
+}
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
