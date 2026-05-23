@@ -139,7 +139,77 @@ async function getShippingLine(session) {
     source: "Stripe Checkout",
   };
 }
+async function getStripePaymentMethod(session) {
+  if (!session.payment_intent) {
+    return {
+      gateway: "Stripe Checkout",
+      note: "Stripe Checkout",
+    };
+  }
 
+  try {
+    const paymentIntent = await stripe.paymentIntents.retrieve(
+      session.payment_intent,
+      {
+        expand: ["payment_method"],
+      }
+    );
+
+    const paymentMethod = paymentIntent.payment_method;
+
+    if (!paymentMethod || typeof paymentMethod === "string") {
+      return {
+        gateway: "Stripe Checkout",
+        note: "Stripe Checkout",
+      };
+    }
+
+    const type = paymentMethod.type;
+
+    if (type === "card") {
+      const brand = paymentMethod.card?.brand || "Card";
+      const last4 = paymentMethod.card?.last4 || "";
+
+      return {
+        gateway: `${brand.toUpperCase()} •••• ${last4}`,
+        note: `Paid with ${brand.toUpperCase()} ending in ${last4}`,
+      };
+    }
+
+    if (type === "klarna") {
+      return {
+        gateway: "Klarna",
+        note: "Paid with Klarna",
+      };
+    }
+
+    if (type === "paypal") {
+      return {
+        gateway: "PayPal",
+        note: "Paid with PayPal",
+      };
+    }
+
+    if (type === "us_bank_account") {
+      return {
+        gateway: "US Bank Account",
+        note: "Paid with US Bank Account",
+      };
+    }
+
+    return {
+      gateway: type.replace(/_/g, " ").toUpperCase(),
+      note: `Paid with ${type.replace(/_/g, " ")}`,
+    };
+  } catch (err) {
+    console.error("Failed to retrieve Stripe payment method:", err.message);
+
+    return {
+      gateway: "Stripe Checkout",
+      note: "Stripe Checkout",
+    };
+  }
+}
 async function createShopifyOrder(session) {
   const shop = process.env.SHOPIFY_STORE_DOMAIN;
   const token = await getShopifyAccessToken();
@@ -158,6 +228,7 @@ async function createShopifyOrder(session) {
 
   const lineItems = await getStripeLineItems(session.id);
   const shippingLine = await getShippingLine(session);
+  const paymentMethod = await getStripePaymentMethod(session);
 
   const orderPayload = {
     order: {
@@ -166,7 +237,7 @@ async function createShopifyOrder(session) {
       financial_status: "paid",
       source_name: "Stripe Checkout",
       tags: "Stripe Checkout, External Payment",
-      note: `Stripe Checkout Session: ${session.id}`,
+      note: `Stripe Checkout Session: ${session.id}\n${paymentMethod.note}`,
       send_receipt: true,
 
       line_items: lineItems,
@@ -177,7 +248,7 @@ async function createShopifyOrder(session) {
           kind: "sale",
           status: "success",
           amount: orderTotal,
-          gateway: "Stripe Checkout",
+          gateway: paymentMethod.gateway,
         },
       ],
 
