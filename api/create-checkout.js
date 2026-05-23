@@ -26,28 +26,52 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing origin" });
     }
 
-    const lineItems = items.map((item) => ({
-      price_data: {
-        currency: "usd",
-        product_data: {
-          name: item.title || "Product",
-          metadata: {
-            shopify_variant_id: String(
-              item.variant_id || item.variantId || item.id || ""
-            ),
-            shopify_product_id: String(
-              item.product_id || item.productId || ""
-            ),
-            original_price: String(
-              item.original_price || item.compare_at_price || ""
-            ),
-            final_price: String(item.price || ""),
-          },
+    const getValidImageUrl = (image) => {
+  if (!image) return null;
+
+  let url = String(image);
+
+  if (url.startsWith("//")) {
+    url = "https:" + url;
+  }
+
+  if (!url.startsWith("https://")) {
+    return null;
+  }
+
+  return url;
+};
+    const lineItems = items.map((item) => {
+  const imageUrl = getValidImageUrl(item.image);
+
+  return {
+    price_data: {
+      currency: "usd",
+      product_data: {
+        name: item.title || "Product",
+
+        ...(imageUrl ? { images: [imageUrl] } : {}),
+
+        metadata: {
+          shopify_variant_id: String(
+            item.variant_id || item.variantId || item.id || ""
+          ),
+          shopify_product_id: String(
+            item.product_id || item.productId || ""
+          ),
+          original_price: String(
+            item.original_price || item.compare_at_price || ""
+          ),
+          final_price: String(item.price || ""),
         },
-        unit_amount: Math.round(Number(item.price) * 100),
       },
-      quantity: item.quantity || 1,
-    }));
+
+      unit_amount: Math.round(Number(item.price) * 100),
+    },
+
+    quantity: item.quantity || 1,
+  };
+});
 
     const cartTotal = lineItems.reduce((sum, item) => {
       return sum + item.price_data.unit_amount * item.quantity;
