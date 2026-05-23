@@ -148,8 +148,13 @@ if (cartTotal >= 30100) {
 }
 
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: lineItems,
+  mode: "payment",
+
+  metadata: {
+    source: "dinhnova_stripe_checkout",
+  },
+
+  line_items: lineItems,
 
       locale: "en",
 
