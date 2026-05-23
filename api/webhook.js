@@ -210,9 +210,46 @@ async function getStripePaymentMethod(session) {
     };
   }
 }
+async function existingOrderExists(sessionId, token, shop) {
+  const response = await fetch(
+    `https://${shop}/admin/api/2026-01/orders.json?status=any&limit=1`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": token,
+      },
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(`Failed to check existing orders: ${JSON.stringify(data)}`);
+  }
+
+  const orders = data.orders || [];
+
+  return orders.some((order) =>
+    order.note?.includes(`Stripe Checkout Session: ${sessionId}`)
+  );
+}
 async function createShopifyOrder(session) {
   const shop = process.env.SHOPIFY_STORE_DOMAIN;
   const token = await getShopifyAccessToken();
+  const existingOrder = await existingOrderExists(
+  session.id,
+  token,
+  shop
+);
+
+if (existingOrder) {
+  console.log(
+    `Order already exists for session ${session.id}, skipping`
+  );
+
+  return;
+}
 
   const currency = (session.currency || "usd").toUpperCase();
   const orderTotal = ((session.amount_total || 0) / 100).toFixed(2);
@@ -237,7 +274,9 @@ async function createShopifyOrder(session) {
       financial_status: "paid",
       source_name: "Stripe Checkout",
       tags: "Stripe Checkout, External Payment",
-      note: `Stripe Checkout Session: ${session.id}\n${paymentMethod.note}`,
+      note: `Stripe Checkout Session: ${session.id}
+Stripe Payment Intent: ${session.payment_intent || "N/A"}
+${paymentMethod.note}`,
       send_receipt: true,
 
       line_items: lineItems,
