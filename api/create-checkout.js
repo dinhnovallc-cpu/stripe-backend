@@ -150,6 +150,8 @@ if (cartTotal >= 30100) {
     const session = await stripe.checkout.sessions.create({
   mode: "payment",
 
+  allow_promotion_codes: true,
+
   metadata: {
     source: "dinhnova_stripe_checkout",
   },
