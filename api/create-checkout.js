@@ -84,7 +84,7 @@ if (cartTotal <= 4899) {
     shipping_rate_data: {
       type: "fixed_amount",
       fixed_amount: {
-        amount: 590,
+        amount: 190,
         currency: "usd",
       },
       display_name: "Standard Shipping",
