@@ -84,7 +84,7 @@ if (cartTotal <= 4899) {
     shipping_rate_data: {
       type: "fixed_amount",
       fixed_amount: {
-        amount: 190,
+        amount: 590,
         currency: "usd",
       },
       display_name: "Standard Shipping",
@@ -123,7 +123,7 @@ if (cartTotal >= 0 && cartTotal <= 30001) {
       },
       display_name: "Expedited Shipping",
       delivery_estimate: {
-        minimum: { unit: "business_day", value: 2 },
+        minimum: { unit: "business_day", value: 1 },
         maximum: { unit: "business_day", value: 3 },
       },
     },
