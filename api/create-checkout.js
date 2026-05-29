@@ -96,7 +96,7 @@ if (cartTotal <= 4899) {
   });
 }
 
-if (cartTotal >= 4900 && cartTotal <= 30000) {
+if (cartTotal >= 3900 && cartTotal <= 30000) {
   shippingOptions.push({
     shipping_rate_data: {
       type: "fixed_amount",
