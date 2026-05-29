@@ -79,7 +79,7 @@ export default async function handler(req, res) {
 
     let shippingOptions = [];
 
-if (cartTotal <= 4899) {
+if (cartTotal <= 3899) {
   shippingOptions.push({
     shipping_rate_data: {
       type: "fixed_amount",
