@@ -79,24 +79,24 @@ export default async function handler(req, res) {
 
     let shippingOptions = [];
 
-if (cartTotal <= 3899) {
+if (cartTotal <= 4899) {
   shippingOptions.push({
     shipping_rate_data: {
       type: "fixed_amount",
       fixed_amount: {
-        amount: 590,
+        amount: 550,
         currency: "usd",
       },
       display_name: "Standard Shipping",
       delivery_estimate: {
         minimum: { unit: "business_day", value: 3 },
-        maximum: { unit: "business_day", value: 12 },
+        maximum: { unit: "business_day", value: 6 },
       },
     },
   });
 }
 
-if (cartTotal >= 3900 && cartTotal <= 30000) {
+if (cartTotal >= 4900 && cartTotal <= 30000) {
   shippingOptions.push({
     shipping_rate_data: {
       type: "fixed_amount",
@@ -118,7 +118,7 @@ if (cartTotal >= 0 && cartTotal <= 30001) {
     shipping_rate_data: {
       type: "fixed_amount",
       fixed_amount: {
-        amount: 1990,
+        amount: 1290,
         currency: "usd",
       },
       display_name: "Expedited Shipping",
