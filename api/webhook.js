@@ -234,6 +234,34 @@ async function existingOrderExists(sessionId, token, shop) {
     order.note?.includes(`Stripe Checkout Session: ${sessionId}`)
   );
 }
+
+function splitName(fullName = "") {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+
+  return {
+    firstName: parts[0] || "",
+    lastName: parts.slice(1).join(" ") || "",
+  };
+}
+
+function buildShopifyAddress({ name, address, phone }) {
+  if (!address) return undefined;
+
+  const { firstName, lastName } = splitName(name || "");
+
+  return {
+    first_name: firstName,
+    last_name: lastName,
+    address1: address.line1 || "",
+    address2: address.line2 || "",
+    city: address.city || "",
+    province_code: address.state || "",
+    country_code: address.country || "",
+    zip: address.postal_code || "",
+    phone: phone || "",
+  };
+}
+
 async function createShopifyOrder(session) {
   const shop = process.env.SHOPIFY_STORE_DOMAIN;
   const token = await getShopifyAccessToken();
@@ -267,6 +295,18 @@ if (existingOrder) {
   const shippingLine = await getShippingLine(session);
   const paymentMethod = await getStripePaymentMethod(session);
 
+  const shippingAddress = buildShopifyAddress({
+    name: session.shipping_details?.name || session.customer_details?.name || "",
+    address: session.shipping_details?.address,
+    phone: session.customer_details?.phone || "",
+  });
+
+  const billingAddress = buildShopifyAddress({
+    name: session.customer_details?.name || "",
+    address: session.customer_details?.address,
+    phone: session.customer_details?.phone || "",
+  });
+
   const orderPayload = {
     order: {
       email: customerEmail,
@@ -297,19 +337,8 @@ ${paymentMethod.note}`,
         email: customerEmail,
       },
 
-      shipping_address: session.customer_details?.address
-        ? {
-            first_name: firstName,
-            last_name: lastName,
-            address1: session.customer_details.address.line1 || "",
-            address2: session.customer_details.address.line2 || "",
-            city: session.customer_details.address.city || "",
-            province: session.customer_details.address.state || "",
-            country: session.customer_details.address.country || "",
-            zip: session.customer_details.address.postal_code || "",
-            phone: session.customer_details.phone || "",
-          }
-        : undefined,
+      shipping_address: shippingAddress,
+      billing_address: billingAddress,
     },
   };
 
