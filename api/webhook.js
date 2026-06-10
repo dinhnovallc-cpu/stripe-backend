@@ -29,8 +29,11 @@ module.exports = async function handler(req, res) {
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
-      console.log("Checkout completed:", session.id);
-      await createShopifyOrder(session);
+console.log("Checkout completed:", session.id);
+
+const fullSession = await stripe.checkout.sessions.retrieve(session.id);
+
+await createShopifyOrder(fullSession);
     }
 
     return res.status(200).json({ received: true });
@@ -286,6 +289,10 @@ if (existingOrder) {
     session.customer_details?.email ||
     session.customer_email ||
     "no-email@stripe-checkout.local";
+  const customerPhone =
+  session.customer_details?.phone ||
+  session.shipping_details?.phone ||
+  "";
 
   const fullName = session.customer_details?.name || "";
   const firstName = fullName.split(" ")[0] || "";
@@ -296,20 +303,27 @@ if (existingOrder) {
   const paymentMethod = await getStripePaymentMethod(session);
 
   const shippingAddress = buildShopifyAddress({
-    name: session.shipping_details?.name || session.customer_details?.name || "",
-    address: session.shipping_details?.address,
-    phone: session.customer_details?.phone || "",
-  });
+  name: session.shipping_details?.name || session.customer_details?.name || "",
+  address: session.shipping_details?.address || session.customer_details?.address,
+  phone:
+    session.shipping_details?.phone ||
+    session.customer_details?.phone ||
+    "",
+});
 
-  const billingAddress = buildShopifyAddress({
-    name: session.customer_details?.name || "",
-    address: session.customer_details?.address,
-    phone: session.customer_details?.phone || "",
-  });
+const billingAddress = buildShopifyAddress({
+  name: session.customer_details?.name || session.shipping_details?.name || "",
+  address: session.customer_details?.address || session.shipping_details?.address,
+  phone:
+    session.customer_details?.phone ||
+    session.shipping_details?.phone ||
+    "",
+});
 
   const orderPayload = {
     order: {
       email: customerEmail,
+      phone: customerPhone,
       currency,
       financial_status: "paid",
       source_name: "Stripe Checkout",
@@ -332,10 +346,11 @@ ${paymentMethod.note}`,
       ],
 
       customer: {
-        first_name: firstName,
-        last_name: lastName,
-        email: customerEmail,
-      },
+  first_name: firstName,
+  last_name: lastName,
+  email: customerEmail,
+  phone: customerPhone,
+},
 
       shipping_address: shippingAddress,
       billing_address: billingAddress,
