@@ -118,7 +118,7 @@ if (cartTotal >= 0 && cartTotal <= 30001) {
     shipping_rate_data: {
       type: "fixed_amount",
       fixed_amount: {
-        amount: 1590,
+        amount: 1990,
         currency: "usd",
       },
       display_name: "Expedited Shipping",
@@ -135,7 +135,7 @@ if (cartTotal >= 30100) {
     shipping_rate_data: {
       type: "fixed_amount",
       fixed_amount: {
-        amount: 690,
+        amount: 990,
         currency: "usd",
       },
       display_name: "Large Order Shipping",
